@@ -27,13 +27,6 @@
 //includes
 	require_once "root.php";
 	require_once "resources/require.php";
-	require_once "resources/check_auth.php";
-
-//check permissions
-	if (!permission_exists('message_view')) {
-		echo "access denied";
-		exit;
-	}
 
 //add multi-lingual support
 	$language = new text;
@@ -47,9 +40,11 @@
 //get media
 	if (is_uuid($message_media_uuid)) {
 
-		$sql = "select message_media_type, message_media_content from v_message_media ";
+		$sql = "select message_media_type, message_media_url, message_media_content from v_message_media ";
 		$sql .= "where message_media_uuid = '".$message_media_uuid."' ";
-		$sql .= "and user_uuid = '".$_SESSION['user_uuid']."' ";
+		if (is_uuid($_SESSION['user_uuid'])) {
+			$sql .= "and user_uuid = '".$_SESSION['user_uuid']."' ";
+		}
 		$sql .= "and (domain_uuid = '".$domain_uuid."' or domain_uuid is null) ";
 		$prep_statement = $db->prepare(check_sql($sql));
 		$prep_statement->execute();
@@ -79,16 +74,17 @@
 
 		switch ($action) {
 			case 'download':
-				header("Content-type: ".$content_type);
-				header("Content-Length: ".strlen($media['message_media_content']));
-				header("Content-Disposition: attachment; filename=\"".$message_media_source."_".$message_media_uuid.".".strtolower($media['message_media_type'])."\"");
+				header("Content-type: ".$content_type."; charset=utf-8");
+				$filename = $message_media_source != '' ? $message_media_source."_".$message_media_uuid.".".strtolower($media['message_media_type']) : $media['message_media_url'];
+				header("Content-Disposition: attachment; filename=\"".$filename."\"");
+				header("Content-Length: ".strlen(base64_decode($media['message_media_content'])));
 				echo base64_decode($media['message_media_content']);
 				break;
 			case 'display':
 				echo "	<table cellpadding='0' cellspacing='0' border='0' width='100%' height='100%'>\n";
 				echo "		<tr>\n";
 				echo "			<td align='center' valign='middle'>\n";
-				echo "				<img src=\"data:".$content_type.";base64, ".$media['message_media_content']."\" style='width: auto; max-width: 95%; height: auto; max-height: 800px; box-shadow: 0px 1px 20px #888; cursor: pointer;' onclick=\"$('#message_media_layer').fadeOut(200);\" oncontextmenu=\"document.location.href='message_media.php?id=".$message_media_uuid."&src=".$message_media_source."&action=download'; return false;\" title=\"Click to Close, Right-Click to Save\">\n";
+				echo "				<img src=\"data:".$content_type.";base64,".$media['message_media_content']."\" style='width: auto; max-width: 95%; height: auto; max-height: 800px; box-shadow: 0px 1px 20px #888; cursor: pointer;' onclick=\"$('#message_media_layer').fadeOut(200);\" oncontextmenu=\"window.open('message_media.php?id=".$message_media_uuid."&src=".$message_media_source."&action=download'); return false;\" title=\"Click to Close, Right-Click to Save\">\n";
 				echo "			</td>\n";
 				echo "		</tr>\n";
 				echo "	</table>\n";

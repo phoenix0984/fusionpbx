@@ -81,15 +81,19 @@
 //delete the group from the user
 	if ($_GET["a"] == "delete" && permission_exists("user_delete")) {
 		//set the variables
-			$group_uuid = check_str($_GET["group_uuid"]);
+			$group_uuid = $_GET["group_uuid"];
 		//delete the group from the users
-			$sql = "delete from v_group_users ";
-			$sql .= "where group_uuid = '".$group_uuid."' ";
-			$sql .= "and user_uuid = '".$user_uuid."' ";
-			$db->exec(check_sql($sql));
+			if (is_uuid($group_uuid) && is_uuid($user_uuid)) {
+				$sql = "delete from v_user_groups ";
+				$sql .= "where group_uuid = '".$group_uuid."' ";
+				$sql .= "and user_uuid = '".$user_uuid."' ";
+				$db->exec(check_sql($sql));
+			}
 		//redirect the user
 			message::add($text['message-update']);
-			header("Location: user_edit.php?id=".$user_uuid);
+			if (is_uuid($user_uuid)) {
+				header("Location: user_edit.php?id=".$user_uuid);
+			}
 			return;
 	}
 
@@ -132,9 +136,8 @@
 			$required['special'] = ($_SESSION['user']['password_special']['boolean'] == 'true') ? true : false;
 
 		//check required values
-			$msg = '';
 			if ($username == '') {
-				$msg .= $text['message-required'].$text['label-username']."<br>\n";
+				message::add($text['message-required'].$text['label-username'], 'negative', 7500);
 			}
 			if (permission_exists('user_edit') && $action == 'edit') {
 				if ($username != $username_old && $username != '') {
@@ -147,60 +150,64 @@
 						$prep_statement->execute();
 						$row = $prep_statement->fetch(PDO::FETCH_ASSOC);
 						if (0 < $row['num_rows']) {
-							$msg .= $text['message-username_exists']."<br>\n";
+							message::add($text['message-username_exists'], 'negative', 7500);
 						}
 					}
 					unset($sql);
 				}
 			}
 			if ($password != '' && $password != $password_confirm) {
-				$msg .= $text['message-password_mismatch']."<br>\n";
+				message::add($text['message-password_mismatch'], 'negative', 7500);
 			}
 			if (permission_exists('user_add') && $action == 'add') {
 				if ($password == '') {
-					$msg .= $text['message-password_blank']."<br>\n";
+					message::add($text['message-password_blank'], 'negative', 7500);
 				}
 				if ($user_email == '') {
-					$msg .= $text['message-required'].$text['label-email']."<br>\n";
+					message::add($text['message-required'].$text['label-email'], 'negative', 7500);
 				}
 				if ($group_uuid_name == '') {
-					$msg .= $text['message-required'].$text['label-group']."<br>\n";
+					message::add($text['message-required'].$text['label-group'], 'negative', 7500);
 				}
 			}
 
 			if (strlen($password) > 0) {
 				if (is_numeric($required['length']) && $required['length'] != 0) {
 					if (strlen($password) < $required['length']) {
-						$msg .= $text['message-required'].$text['label-characters']."<br>\n";
+						message::add($text['message-required'].$text['label-characters'], 'negative', 7500);
 					}
 				}
 				if ($required['number']) {
 					if (!preg_match('/(?=.*[\d])/', $password)) {
-						$msg .= $text['message-required'].$text['label-numbers']."<br>\n";
+						message::add($text['message-required'].$text['label-numbers'], 'negative', 7500);
 					}
 				}
 				if ($required['lowercase']) {
 					if (!preg_match('/(?=.*[a-z])/', $password)) {
-						$msg .= $text['message-required'].$text['label-lowercase_letters']."<br>\n";
+						message::add($text['message-required'].$text['label-lowercase_letters'], 'negative', 7500);
 					}
 				}
 				if ($required['uppercase']) {
 					if (!preg_match('/(?=.*[A-Z])/', $password)) {
-						$msg .= $text['message-required'].$text['label-uppercase_letters']."<br>\n";
+						message::add($text['message-required'].$text['label-uppercase_letters'], 'negative', 7500);
 					}
 				}
 				if ($required['special']) {
 					if (!preg_match('/(?=.*[\W])/', $password)) {
-						$msg .= $text['message-required'].$text['label-special_characters']."<br>\n";
+						message::add($text['message-required'].$text['label-special_characters'], 'negative', 7500);
 					}
 				}
 			}
-	}
 
-//save the data
-	if (strlen($msg) == 0 && count($_POST) > 0) {
-		//set initial array indexes
-			$i = $n = $x = $c = 0;
+		//return if error
+			if (message::count() != 0) {
+				$_SESSION['tmp'][$_SERVER['PHP_SELF']]['user'] = $_POST;
+				header("Location: user_edit.php?id=".$user_uuid);
+				exit;
+			}
+
+		//save the data
+			$i = $n = $x = $c = 0; //set initial array indexes
 
 		//check to see if user language is set
 			$sql = "select user_setting_uuid, user_setting_value from v_user_settings ";
@@ -346,23 +353,23 @@
 				$group_uuid = $group_data[0];
 				$group_name = $group_data[1];
 				//only a superadmin can add other superadmins or admins, admins can only add other admins
-					switch ($group_name) {
-						case "superadmin": if (!if_group("superadmin")) { break; }
-						case "admin": if (!if_group("superadmin") && !if_group("admin")) { break; }
-						default: //add group user to array for insert
-							$array['group_users'][$n]['group_user_uuid'] = uuid();
-							$array['group_users'][$n]['domain_uuid'] = $domain_uuid;
-							$array['group_users'][$n]['group_name'] = $group_name;
-							$array['group_users'][$n]['group_uuid'] = $group_uuid;
-							$array['group_users'][$n]['user_uuid'] = $user_uuid;
-							$n++;
-					}
+				switch ($group_name) {
+					case "superadmin": if (!if_group("superadmin")) { break; }
+					case "admin": if (!if_group("superadmin") && !if_group("admin")) { break; }
+					default: //add group user to array for insert
+						$array['user_groups'][$n]['user_group_uuid'] = uuid();
+						$array['user_groups'][$n]['domain_uuid'] = $domain_uuid;
+						$array['user_groups'][$n]['group_name'] = $group_name;
+						$array['user_groups'][$n]['group_uuid'] = $group_uuid;
+						$array['user_groups'][$n]['user_uuid'] = $user_uuid;
+						$n++;
+				}
 			}
 
 		//update domain, if changed
 			if ((permission_exists('user_add') || permission_exists('user_edit')) && permission_exists('user_domain')) {
 				//adjust group user records
-					$sql = "select group_user_uuid from v_group_users ";
+					$sql = "select user_group_uuid from v_user_groups ";
 					$sql .= "where user_uuid = '".$user_uuid."' ";
 					$prep_statement = $db->prepare(check_sql($sql));
 					if ($prep_statement) {
@@ -370,8 +377,8 @@
 						$result = $prep_statement->fetchAll(PDO::FETCH_ASSOC);
 						foreach ($result as $row) {
 							//add group user to array for update
-								$array['group_users'][$n]['group_user_uuid'] = $row['group_user_uuid'];
-								$array['group_users'][$n]['domain_uuid'] = $domain_uuid;
+								$array['user_groups'][$n]['user_group_uuid'] = $row['user_group_uuid'];
+								$array['user_groups'][$n]['domain_uuid'] = $domain_uuid;
 								$n++;
 						}
 					}
@@ -392,7 +399,7 @@
 					}
 					unset($sql, $prep_statement, $result, $row);
 				//unassign any foreign domain groups
-					$sql = "delete from v_group_users where ";
+					$sql = "delete from v_user_groups where ";
 					$sql .= "domain_uuid = '".$domain_uuid."' ";
 					$sql .= "and user_uuid = '".$user_uuid."' ";
 					$sql .= "and group_uuid not in (";
@@ -492,69 +499,100 @@
 						$response = event_socket_request($fp, $cmd);
 					}
 			}
+
+		//response message
+			if ($action == 'edit') {
+				message::add($text['message-update'],'positive');
+			}
+			else {
+				message::add($text['message-add'],'positive');
+			}
+			header("Location: user_edit.php?id=".$user_uuid);
+			exit;
 	}
 
 //pre-populate the form
 	if ($action == 'edit') {
-		//get user data
-			$sql = "select * from v_users where user_uuid = '".$user_uuid."' ";
-			if (!permission_exists('user_all')) {
-				$sql .= "and domain_uuid = '".$domain_uuid."' ";
-			}
-			$prep_statement = $db->prepare(check_sql($sql));
-			$prep_statement->execute();
-			$row = $prep_statement->fetch(PDO::FETCH_NAMED);
-			if (is_array($row) && sizeof($row) > 0) {
-				$domain_uuid = $row["domain_uuid"];
-				$user_uuid = $row["user_uuid"];
-				$username = $row["username"];
-				$password = $row["password"];
-				$api_key = $row["api_key"];
-				$user_enabled = $row["user_enabled"];
-				$contact_uuid = $row["contact_uuid"];
-				$user_status = $row["user_status"];
-			}
-			else {
-				header("Location: user_edit.php?id=".$_SESSION['user_uuid']);
-				exit;
-			}
-			unset($sql, $prep_statement, $row);
 
-		//get user settings
-			$sql = "select * from v_user_settings ";
-			$sql .= "where user_uuid = '".$user_uuid."' ";
-			$sql .= "and user_setting_enabled = 'true' ";
-			$prep_statement = $db->prepare($sql);
-			if ($prep_statement) {
+	//get values from session variable
+		if (
+			is_array($_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']) &&
+			sizeof($_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']) != 0)
+			{
+			$domain_uuid = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']["domain_uuid"];
+			$username = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']["username"];
+			$api_key = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']["api_key"];
+			$user_enabled = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']["user_enabled"];
+			$contact_uuid = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']["contact_uuid"];
+			$user_status = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']["user_status"];
+			$password_confirm = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']['password_confirm'];
+			$user_settings['domain']['language']['code'] = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']['user_language'];
+			$user_settings['domain']['time_zone']['name'] = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']['user_time_zone'];
+			$user_email = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']['user_email'];
+			$contact_name_given = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']['contact_name_given'];
+			$contact_name_family = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']['contact_name_family'];
+			$contact_organization = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']['contact_organization'];
+			$user_settings["message"]["key"]["text"] = $_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']['message_key'];
+
+			$unsaved = true;
+			unset($_SESSION['tmp'][$_SERVER['PHP_SELF']]['user']);
+		}
+
+	//get values from db
+		else {
+
+			//get user data
+				$sql = "select * from v_users where user_uuid = '".$user_uuid."' ";
+				if (!permission_exists('user_all')) {
+					$sql .= "and domain_uuid = '".$domain_uuid."' ";
+				}
+				$prep_statement = $db->prepare(check_sql($sql));
 				$prep_statement->execute();
-				$result = $prep_statement->fetchAll(PDO::FETCH_NAMED);
-				foreach($result as $row) {
-					$name = $row['user_setting_name'];
-					$category = $row['user_setting_category'];
-					$subcategory = $row['user_setting_subcategory'];
-					if (strlen($subcategory) == 0) {
-						//$$category[$name] = $row['domain_setting_value'];
-						$user_settings[$category][$name] = $row['user_setting_value'];
-					}
-					else {
-						$user_settings[$category][$subcategory][$name] = $row['user_setting_value'];
+				$row = $prep_statement->fetch(PDO::FETCH_NAMED);
+				if (is_array($row) && sizeof($row) > 0) {
+					$domain_uuid = $row["domain_uuid"];
+					$user_uuid = $row["user_uuid"];
+					$username = $row["username"];
+					$password = $row["password"];
+					$api_key = $row["api_key"];
+					$user_enabled = $row["user_enabled"];
+					$contact_uuid = $row["contact_uuid"];
+					$user_status = $row["user_status"];
+				}
+				else {
+					message::add($text['message-invalid_user'], 'negative', 7500);
+					header("Location: user_edit.php?id=".$_SESSION['user_uuid']);
+					exit;
+				}
+				unset($sql, $prep_statement, $row);
+
+			//get user settings
+				$sql = "select * from v_user_settings ";
+				$sql .= "where user_uuid = '".$user_uuid."' ";
+				$sql .= "and user_setting_enabled = 'true' ";
+				$prep_statement = $db->prepare($sql);
+				if ($prep_statement) {
+					$prep_statement->execute();
+					$result = $prep_statement->fetchAll(PDO::FETCH_NAMED);
+					foreach($result as $row) {
+						$name = $row['user_setting_name'];
+						$category = $row['user_setting_category'];
+						$subcategory = $row['user_setting_subcategory'];
+						if (strlen($subcategory) == 0) {
+							//$$category[$name] = $row['domain_setting_value'];
+							$user_settings[$category][$name] = $row['user_setting_value'];
+						}
+						else {
+							$user_settings[$category][$subcategory][$name] = $row['user_setting_value'];
+						}
 					}
 				}
-			}
+		}
 	}
 
 //include the header
 	require_once "resources/header.php";
 	$document['title'] = $text['title-user_edit'];
-
-//show the error message
-	if (isset($msg) && strlen($msg) > 0) {
-		echo "<div align='center'>\n";
-		echo "<table><tr><td>\n";
-		echo $msg."<br />";
-		echo "</td></tr></table>\n";
-		echo "</div>\n";
-	}
 
 //show the content
 	echo "<script>\n";
@@ -591,24 +629,17 @@
 	echo "<form name='frm' id='frm' method='post'>\n";
 	echo "<input type='hidden' name='action' id='action' value=''>\n";
 
-	echo "<table cellpadding='0' cellspacing='0' border='0' width='100%'>";
-	echo "<tr>\n";
-	echo "<td align='left' width='90%' valign='top' nowrap><b>".$text['header-user_edit']."</b></td>\n";
-	echo "<td align='right' nowrap>\n";
+	echo "<div style='float:right; white-space: nowrap;'>\n";
+	if ($unsaved) {
+		echo "<span style='color: #b00;'>".$text['message-unsaved_changes']." <i class='glyphicon glyphicon-warning-sign' style='margin-right: 15px;'></i></span>";
+	}
 	if (permission_exists('user_add') || permission_exists('user_edit')) {
-		echo "	<input type='button' class='btn' onclick=\"window.location='users.php'\" value='".$text['button-back']."'>";
+		echo "	<input type='button' class='btn' style='padding-right: 10px;' onclick=\"window.location='users.php'\" value='".$text['button-back']."'>";
 	}
 	echo "	<input type='submit' class='btn' value='".$text['button-save']."'>";
-	echo "</td>\n";
-	echo "</tr>\n";
-	echo "<tr>\n";
-	echo "<td align='left' colspan='2'>\n";
-	echo "	".$text['description-user_edit']."\n";
-	echo "</td>\n";
-	echo "</tr>\n";
-	echo "</table>\n";
-
-	echo "<br />\n";
+	echo "</div>\n";
+	echo "<b>".$text['header-user_edit']."</b><br />\n";
+	echo $text['description-user_edit']."<br /><br />\n";
 
 	echo "<table cellpadding='0' cellspacing='0' border='0' width='100%'>";
 
@@ -616,11 +647,11 @@
 	echo "		<td width='30%' class='vncellreq' valign='top'>".$text['label-username']."</td>";
 	echo "		<td width='70%' class='vtable'>";
 	if (permission_exists("user_edit")) {
-		echo "		<input type='text' class='formfld' name='username' id='username' value='".escape($username)."' required='required'>\n";
+		echo "		<input type='text' class='formfld' name='username' id='username' autocomplete='new-password' value='".escape($username)."' required='required'>\n";
 	}
 	else {
 		echo "		".escape($username)."\n";
-		echo "		<input type='hidden' name='username' id='username' value='".escape($username)."'>\n";
+		echo "		<input type='hidden' name='username' id='username' autocomplete='new-password' value='".escape($username)."'>\n";
 	}
 	echo "		</td>";
 	echo "	</tr>";
@@ -629,14 +660,14 @@
 	echo "		<td class='vncell".(($action == 'add') ? 'req' : null)."' valign='top'>".$text['label-password']."</td>";
 	echo "		<td class='vtable'>";
 	echo "			<input style='display: none;' type='password'>";
-	echo "			<input type='password' autocomplete='off' class='formfld' name='password' id='password' value='' onkeypress='show_strength_meter();' onfocus='compare_passwords();' onkeyup='compare_passwords();' onblur='compare_passwords();'>";
+	echo "			<input type='password' autocomplete='new-password' class='formfld' name='password' id='password' value='' onkeypress='show_strength_meter();' onfocus='compare_passwords();' onkeyup='compare_passwords();' onblur='compare_passwords();'>";
 	echo "			<div id='pwstrength_progress' class='pwstrength_progress'></div>";
 	echo "		</td>";
 	echo "	</tr>";
 	echo "	<tr>";
 	echo "		<td class='vncell".(($action == 'add') ? 'req' : null)."' valign='top'>".$text['label-confirm_password']."</td>";
 	echo "		<td class='vtable'>";
-	echo "			<input type='password' autocomplete='off' class='formfld' name='password_confirm' id='password_confirm' value='' onfocus='compare_passwords();' onkeyup='compare_passwords();' onblur='compare_passwords();'>";
+	echo "			<input type='password' autocomplete='new-password' class='formfld' name='password_confirm' id='password_confirm' value='' onfocus='compare_passwords();' onkeyup='compare_passwords();' onblur='compare_passwords();'>";
 	echo "		</td>";
 	echo "	</tr>";
 
@@ -726,9 +757,33 @@
 		echo "	<tr>";
 		echo "		<td class='vncell' valign='top'>".$text['label-contact']."</td>";
 		echo "		<td class='vtable'>\n";
-		$sql = " select contact_uuid, contact_organization, contact_name_given, contact_name_family, contact_nickname from v_contacts ";
-		$sql .= " where domain_uuid = '".escape($domain_uuid)."' ";
-		$sql .= " order by contact_organization desc, contact_name_family asc, contact_name_given asc, contact_nickname asc ";
+		$sql = "select ";
+		$sql .= "c.contact_uuid, ";
+		$sql .= "c.contact_organization, ";
+		$sql .= "c.contact_name_given, ";
+		$sql .= "c.contact_name_family, ";
+		$sql .= "c.contact_nickname ";
+		$sql .= "from ";
+		$sql .= "v_contacts as c ";
+		$sql .= "where ";
+		$sql .= "c.domain_uuid = '".escape($domain_uuid)."' ";
+		$sql .= "and not exists ( ";
+		$sql .= "	select ";
+		$sql .= "	contact_uuid ";
+		$sql .= "	from ";
+		$sql .= "	v_users as u ";
+		$sql .= "	where ";
+		$sql .= "	u.domain_uuid = '".escape($domain_uuid)."' ";
+		if (is_uuid($contact_uuid)) { //don't exclude currently assigned contact
+			$sql .= "and u.contact_uuid <> '".escape($contact_uuid)."' ";
+		}
+		$sql .= "	and u.contact_uuid = c.contact_uuid ";
+		$sql .= ") ";
+		$sql .= "order by ";
+		$sql .= "lower(c.contact_organization) asc, ";
+		$sql .= "lower(c.contact_name_family) asc, ";
+		$sql .= "lower(c.contact_name_given) asc, ";
+		$sql .= "lower(c.contact_nickname) asc ";
 		$prep_statement = $db->prepare(check_sql($sql));
 		$prep_statement->execute();
 		$result = $prep_statement->fetchAll(PDO::FETCH_NAMED);
@@ -772,24 +827,24 @@
 		echo "	</tr>";
 	}
 
-	if ((permission_exists("user_add") && $action == 'add') || (permission_exists("user_edit") && $action == 'edit')) {
+	if (permission_exists("user_groups")) {
 		echo "	<tr>";
-		echo "		<td class='vncellreq' valign='top'>".$text['label-group'.(($action == 'edit') ? 's' : null)]."</td>";
+		echo "		<td class='vncellreq' valign='top'>".$text['label-groups']."</td>";
 		echo "		<td class='vtable'>";
 
 		$sql = "select ";
-		$sql .= "	gu.*, g.domain_uuid as group_domain_uuid ";
+		$sql .= "	ug.*, g.domain_uuid as group_domain_uuid ";
 		$sql .= "from ";
-		$sql .= "	v_group_users as gu, ";
+		$sql .= "	v_user_groups as ug, ";
 		$sql .= "	v_groups as g ";
 		$sql .= "where ";
-		$sql .= "	gu.group_uuid = g.group_uuid ";
+		$sql .= "	ug.group_uuid = g.group_uuid ";
 		$sql .= "	and (";
 		$sql .= "		g.domain_uuid = :domain_uuid ";
 		$sql .= "		or g.domain_uuid is null ";
 		$sql .= "	) ";
-		$sql .= "	and gu.domain_uuid = :domain_uuid ";
-		$sql .= "	and gu.user_uuid = :user_uuid ";
+		$sql .= "	and ug.domain_uuid = :domain_uuid ";
+		$sql .= "	and ug.user_uuid = :user_uuid ";
 		$sql .= "order by ";
 		$sql .= "	g.domain_uuid desc, ";
 		$sql .= "	g.group_name asc ";
@@ -798,8 +853,7 @@
 		$prep_statement->bindParam(':user_uuid', $user_uuid);
 		$prep_statement->execute();
 		$result = $prep_statement->fetchAll(PDO::FETCH_NAMED);
-		$result_count = count($result);
-		if ($result_count > 0) {
+		if (is_array($result)) {
 			echo "<table cellpadding='0' cellspacing='0' border='0'>\n";
 			foreach($result as $field) {
 				if (strlen($field['group_name']) > 0) {
@@ -807,12 +861,10 @@
 					echo "	<td class='vtable' style='white-space: nowrap; padding-right: 30px;' nowrap='nowrap'>";
 					echo escape($field['group_name']).(($field['group_domain_uuid'] != '') ? "@".$_SESSION['domains'][$field['group_domain_uuid']]['domain_name'] : null);
 					echo "	</td>\n";
-					if ($result_count > 1) {
-						if (permission_exists('group_member_delete') || if_group("superadmin")) {
-							echo "	<td class='list_control_icons' style='width: 25px;'>\n";
-							echo "		<a href='user_edit.php?id=".escape($user_uuid)."&domain_uuid=".escape($domain_uuid)."&group_uuid=".escape($field['group_uuid'])."&a=delete' alt='".$text['button-delete']."' onclick=\"return confirm('".$text['confirm-delete']."')\">".$v_link_label_delete."</a>\n";
-							echo "	</td>\n";
-						}
+					if (permission_exists('group_member_delete') || if_group("superadmin")) {
+						echo "	<td class='list_control_icons' style='width: 25px;'>\n";
+						echo "		<a href='user_edit.php?id=".escape($user_uuid)."&domain_uuid=".escape($domain_uuid)."&group_uuid=".escape($field['group_uuid'])."&a=delete' alt='".$text['button-delete']."' onclick=\"return confirm('".$text['confirm-delete']."')\">".$v_link_label_delete."</a>\n";
+						echo "	</td>\n";
 					}
 					echo "</tr>\n";
 					$assigned_groups[] = $field['group_uuid'];
@@ -820,7 +872,7 @@
 			}
 			echo "</table>\n";
 		}
-		unset($sql, $prep_statement, $result, $result_count);
+		unset($sql, $prep_statement, $result);
 
 		$sql = "select * from v_groups ";
 		$sql .= "where (domain_uuid = '".$domain_uuid."' or domain_uuid is null) ";
@@ -852,64 +904,21 @@
 
 		echo "		</td>";
 		echo "	</tr>";
+	}
 
-		if (permission_exists('user_domain')) {
-			echo "<tr>\n";
-			echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
-			echo "	".$text['label-domain']."\n";
-			echo "</td>\n";
-			echo "<td class='vtable' align='left'>\n";
-			echo "    <select class='formfld' name='domain_uuid'>\n";
-			foreach ($_SESSION['domains'] as $row) {
-				echo "	<option value='".escape($row['domain_uuid'])."' ".(($row['domain_uuid'] == $domain_uuid) ? "selected='selected'" : null).">".escape($row['domain_name'])."</option>\n";
-			}
-			echo "    </select>\n";
-			echo "<br />\n";
-			echo $text['description-domain_name']."\n";
-			echo "</td>\n";
-			echo "</tr>\n";
-		}
-		else {
-			echo "<input type='hidden' name='domain_uuid' value='".escape($domain_uuid)."'>";
-		}
-
-		if (permission_exists('api_key')) {
-			echo "	<tr>";
-			echo "		<td class='vncell' valign='top'>".$text['label-api_key']."</td>";
-			echo "		<td class='vtable'>\n";
-			echo "			<input type=\"text\" class='formfld' name=\"api_key\" id='api_key' value=\"".escape($api_key)."\" >";
-			echo "			<input type='button' class='btn' value='".$text['button-generate']."' onclick=\"getElementById('api_key').value='".uuid()."';\">";
-			if (strlen($text['description-api_key']) > 0) {
-				echo "			<br />".$text['description-api_key']."<br />\n";
-			}
-			echo "		</td>";
-			echo "	</tr>";
-		}
-
-		if (permission_exists('message_view')) {
-			echo "	<tr>";
-			echo "		<td class='vncell' valign='top'>".$text['label-message_key']."</td>";
-			echo "		<td class='vtable'>\n";
-			echo "			<input type=\"text\" class='formfld' name=\"message_key\" id='message_key' value=\"".escape($user_settings["message"]["key"]["text"])."\" >";
-			echo "			<input type='button' class='btn' value='".$text['button-generate']."' onclick=\"getElementById('message_key').value='".uuid()."';\">";
-			if (strlen($text['description-message_key']) > 0) {
-				echo "			<br />".$text['description-message_key']."<br />\n";
-			}
-			echo "		</td>";
-			echo "	</tr>";
-		}
-
+	if (permission_exists('user_domain')) {
 		echo "<tr>\n";
 		echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
-		echo "	".$text['label-enabled']."\n";
+		echo "	".$text['label-domain']."\n";
 		echo "</td>\n";
 		echo "<td class='vtable' align='left'>\n";
-		echo "	<select class='formfld' name='user_enabled'>\n";
-		echo "		<option value='true'>".$text['option-true']."</option>\n";
-		echo "		<option value='false' ".(($user_enabled != "true") ? "selected='selected'" : null).">".$text['option-false']."</option>\n";
-		echo "	</select>\n";
+		echo "    <select class='formfld' name='domain_uuid'>\n";
+		foreach ($_SESSION['domains'] as $row) {
+			echo "	<option value='".escape($row['domain_uuid'])."' ".(($row['domain_uuid'] == $domain_uuid) ? "selected='selected'" : null).">".escape($row['domain_name'])."</option>\n";
+		}
+		echo "    </select>\n";
 		echo "<br />\n";
-		echo $text['description-enabled']."\n";
+		echo $text['description-domain_name']."\n";
 		echo "</td>\n";
 		echo "</tr>\n";
 	}
@@ -917,15 +926,58 @@
 		echo "<input type='hidden' name='domain_uuid' value='".escape($domain_uuid)."'>";
 	}
 
+	if (permission_exists('api_key')) {
+		echo "	<tr>";
+		echo "		<td class='vncell' valign='top'>".$text['label-api_key']."</td>";
+		echo "		<td class='vtable'>\n";
+		echo "			<input type=\"text\" class='formfld' name=\"api_key\" id='api_key' value=\"".escape($api_key)."\" >";
+		echo "			<input type='button' class='btn' value='".$text['button-generate']."' onclick=\"getElementById('api_key').value='".uuid()."';\">";
+		if (strlen($text['description-api_key']) > 0) {
+			echo "			<br />".$text['description-api_key']."<br />\n";
+		}
+		echo "		</td>";
+		echo "	</tr>";
+	}
+
+	if (permission_exists('message_view')) {
+		echo "	<tr>";
+		echo "		<td class='vncell' valign='top'>".$text['label-message_key']."</td>";
+		echo "		<td class='vtable'>\n";
+		echo "			<input type='text' class='formfld' name='message_key' id='message_key' value=\"".escape($user_settings["message"]["key"]["text"])."\" >";
+		echo "			<input type='button' class='btn' value='".$text['button-generate']."' onclick=\"getElementById('message_key').value='".uuid()."';\">";
+		if (strlen($text['description-message_key']) > 0) {
+			echo "			<br />".$text['description-message_key']."<br />\n";
+		}
+		echo "		</td>";
+		echo "	</tr>";
+	}
+
+	echo "<tr ".($user_uuid == $_SESSION['user_uuid'] ? "style='display: none;'" : null).">\n";
+	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
+	echo "	".$text['label-enabled']."\n";
+	echo "</td>\n";
+	echo "<td class='vtable' align='left'>\n";
+	echo "	<select class='formfld' name='user_enabled'>\n";
+	echo "		<option value='true'>".$text['option-true']."</option>\n";
+	echo "		<option value='false' ".(($user_enabled != "true") ? "selected='selected'" : null).">".$text['option-false']."</option>\n";
+	echo "	</select>\n";
+	echo "<br />\n";
+	echo $text['description-enabled']."\n";
+	echo "</td>\n";
+	echo "</tr>\n";
+
 	echo "	<tr>";
-	echo "		<td colspan='2' align='right'>";
+	echo "		<td colspan='2' align='right' style='white-space: nowrap;'>";
 	if ($action == 'edit') {
 		echo "		<input type='hidden' name='id' value=\"".escape($user_uuid)."\">";
 		if (permission_exists("user_edit")) {
-			echo "	<input type='hidden' name='username_old' value=\"".escape($username)."\">";
+			echo "			<input type='hidden' name='username_old' value=\"".escape($username)."\">";
 		}
 	}
 	echo "			<br>";
+	if ($unsaved) {
+		echo "		<span style='color: #b00;'>".$text['message-unsaved_changes']." <i class='glyphicon glyphicon-warning-sign' style='margin-right: 15px;'></i></span>";
+	}
 	echo "			<input type='submit' class='btn' value='".$text['button-save']."'>";
 	echo "		</td>";
 	echo "	</tr>";

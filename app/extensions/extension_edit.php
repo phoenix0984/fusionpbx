@@ -131,6 +131,9 @@
 			if (!is_numeric($voicemail_id)) {
 				$voicemail_id = NULL;
 			}
+			
+			//change toll allow delimiter
+			$toll_allow = str_replace(',',':', $toll_allow);
 	}
 
 //delete the user from the v_extension_users
@@ -298,7 +301,10 @@
 									}
 
 								//generate a password
-									if (strlen($password) == 0) {
+									if ($action == "add" && strlen($password) == 0) {
+										$password = generate_password();
+									}
+									if ($action == "update" && permission_exists('extension_password') && strlen($password) == 0) {
 										$password = generate_password();
 									}
 
@@ -309,12 +315,18 @@
 									if (permission_exists('number_alias')) {
 										$array["extensions"][$i]["number_alias"] = $number_alias;
 									}
-									$array["extensions"][$i]["password"] = $password;
+									if (strlen($password) > 0) {
+										$array["extensions"][$i]["password"] = $password;
+									}
 									if (permission_exists('extension_accountcode')) {
 										$array["extensions"][$i]["accountcode"] = $accountcode;
 									}
-									$array["extensions"][$i]["effective_caller_id_name"] = $effective_caller_id_name;
-									$array["extensions"][$i]["effective_caller_id_number"] = $effective_caller_id_number;
+									if (permission_exists("effective_caller_id_name")) {
+										$array["extensions"][$i]["effective_caller_id_name"] = $effective_caller_id_name;
+									}
+									if (permission_exists("effective_caller_id_number")) {
+										$array["extensions"][$i]["effective_caller_id_number"] = $effective_caller_id_number;
+									}
 									if (permission_exists("outbound_caller_id_name")) {
 										$array["extensions"][$i]["outbound_caller_id_name"] = $outbound_caller_id_name;
 									}
@@ -351,7 +363,9 @@
 									}
 									$array["extensions"][$i]["hold_music"] = $hold_music;
 									$array["extensions"][$i]["auth_acl"] = $auth_acl;
-									$array["extensions"][$i]["cidr"] = $cidr;
+									if (permission_exists("extension_cidr")) {
+										$array["extensions"][$i]["cidr"] = $cidr;
+									}
 									$array["extensions"][$i]["sip_force_contact"] = $sip_force_contact;
 									$array["extensions"][$i]["sip_force_expires"] = $sip_force_expires;
 									if (permission_exists('extension_nibble_account')) {
@@ -452,7 +466,15 @@
 						$db->exec(check_sql($sql));
 						unset($sql);
 					}
-
+				//update device key label
+					if (strlen($effective_caller_id_name) > 0) {
+						$sql = "update v_device_keys set ";
+						$sql .= "device_key_label = '".$effective_caller_id_name."' ";
+						$sql .= "where domain_uuid = '".$_SESSION['domain_uuid']."' ";
+						$sql .= "and device_key_value = '".$extension."' ";
+						$db->exec(check_sql($sql));
+						unset($sql);
+					}
 				//assign the user to the extension 
 					if ($action == "update" && strlen($_POST["extension_users"][0]["user_uuid"]) > 0) {
 						$array["extension_users"][0]["extension_user_uuid"] = uuid();
@@ -756,6 +778,9 @@
 	$destinations = $prep_statement->fetchAll(PDO::FETCH_ASSOC);
 	unset ($sql, $prep_statement);
 
+//change toll allow delimiter
+	$toll_allow = str_replace(':',',', $toll_allow);
+
 //set the defaults
 	if (strlen($user_context) == 0) { $user_context = $_SESSION['domain_name']; }
 	if (strlen($limit_max) == 0) { $limit_max = '5'; }
@@ -831,7 +856,7 @@
 	echo "    ".$text['label-extension']."\n";
 	echo "</td>\n";
 	echo "<td class='vtable' align='left'>\n";
-	echo "    <input class='formfld' type='text' name='extension' autocomplete='off' maxlength='255' value=\"".escape($extension)."\" required='required'>\n";
+	echo "    <input class='formfld' type='text' name='extension' autocomplete='new-password' maxlength='255' value=\"".escape($extension)."\" required='required'>\n";
 	echo "<br />\n";
 	echo $text['description-extension']."\n";
 	echo "</td>\n";
@@ -843,7 +868,7 @@
 		echo "    ".$text['label-number_alias']."\n";
 		echo "</td>\n";
 		echo "<td class='vtable' align='left'>\n";
-		echo "    <input class='formfld' type='number' name='number_alias' autocomplete='off' maxlength='255' min='0' step='1' value=\"".escape($number_alias)."\">\n";
+		echo "    <input class='formfld' type='number' name='number_alias' autocomplete='new-password' maxlength='255' min='0' step='1' value=\"".escape($number_alias)."\">\n";
 		echo "<br />\n";
 		echo $text['description-number_alias']."\n";
 		echo "</td>\n";
@@ -856,7 +881,7 @@
 		echo "    ".$text['label-password']."\n";
 		echo "</td>\n";
 		echo "<td class='vtable' align='left'>\n";
-		echo "    <input class='formfld' type='password' name='password' id='password' autocomplete='off' onmouseover=\"this.type='text';\" onfocus=\"this.type='text';\" onmouseout=\"if (!$(this).is(':focus')) { this.type='password'; }\" onblur=\"this.type='password';\" maxlength='50' value=\"".escape($password)."\">\n";
+		echo "    <input class='formfld' type='password' name='password' id='password' autocomplete='new-password' onmouseover=\"this.type='text';\" onfocus=\"this.type='text';\" onmouseout=\"if (!$(this).is(':focus')) { this.type='password'; }\" onblur=\"this.type='password';\" maxlength='50' value=\"".escape($password)."\">\n";
 		echo "    <br />\n";
 		echo "    ".$text['description-password']."\n";
 		echo "</td>\n";
@@ -947,7 +972,7 @@
 		echo "    ".$text['label-voicemail_password']."\n";
 		echo "</td>\n";
 		echo "<td class='vtable' align='left'>\n";
-		echo "    <input class='formfld' type='text' name='voicemail_password' id='voicemail_password' autocomplete='off' onmouseover=\"this.type='text';\" onfocus=\"this.type='text';\" onmouseout=\"if (!$(this).is(':focus')) { this.type='password'; }\" onblur=\"this.type='password';\" maxlength='255' value='".escape($voicemail_password)."'>\n";
+		echo "    <input class='formfld' type='text' name='voicemail_password' id='voicemail_password' autocomplete='new-password' onmouseover=\"this.type='text';\" onfocus=\"this.type='text';\" onmouseout=\"if (!$(this).is(':focus')) { this.type='password'; }\" onblur=\"this.type='password';\" maxlength='255' value='".escape($voicemail_password)."'>\n";
 		echo "    <br />\n";
 		echo "    ".$text['description-voicemail_password']."\n";
 		echo "</td>\n";
@@ -1117,27 +1142,31 @@
 		}
 	}
 
-	echo "<tr>\n";
-	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
-	echo "    ".$text['label-effective_caller_id_name']."\n";
-	echo "</td>\n";
-	echo "<td class='vtable' align='left'>\n";
-	echo "    <input class='formfld' type='text' name='effective_caller_id_name' maxlength='255' value=\"".escape($effective_caller_id_name)."\">\n";
-	echo "<br />\n";
-	echo $text['description-effective_caller_id_name']."\n";
-	echo "</td>\n";
-	echo "</tr>\n";
+	if (permission_exists("effective_caller_id_name")) {
+		echo "<tr>\n";
+		echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
+		echo "    ".$text['label-effective_caller_id_name']."\n";
+		echo "</td>\n";
+		echo "<td class='vtable' align='left'>\n";
+		echo "    <input class='formfld' type='text' name='effective_caller_id_name' maxlength='255' value=\"".escape($effective_caller_id_name)."\">\n";
+		echo "<br />\n";
+		echo $text['description-effective_caller_id_name']."\n";
+		echo "</td>\n";
+		echo "</tr>\n";
+	}
 
-	echo "<tr>\n";
-	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
-	echo "    ".$text['label-effective_caller_id_number']."\n";
-	echo "</td>\n";
-	echo "<td class='vtable' align='left'>\n";
-	echo "    <input class='formfld' type='text' name='effective_caller_id_number' min='0' step='1' maxlength='255' value=\"".escape($effective_caller_id_number)."\">\n";
-	echo "<br />\n";
-	echo $text['description-effective_caller_id_number']."\n";
-	echo "</td>\n";
-	echo "</tr>\n";
+	if (permission_exists("effective_caller_id_number")) {
+		echo "<tr>\n";
+		echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
+		echo "    ".$text['label-effective_caller_id_number']."\n";
+		echo "</td>\n";
+		echo "<td class='vtable' align='left'>\n";
+		echo "    <input class='formfld' type='text' name='effective_caller_id_number' min='0' step='1' maxlength='255' value=\"".escape($effective_caller_id_number)."\">\n";
+		echo "<br />\n";
+		echo $text['description-effective_caller_id_number']."\n";
+		echo "</td>\n";
+		echo "</tr>\n";
+	}
 
 	if (permission_exists("outbound_caller_id_name")) {
 		echo "<tr>\n";
@@ -1608,16 +1637,18 @@
 	echo "</td>\n";
 	echo "</tr>\n";
 
-	echo "<tr>\n";
-	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
-	echo "    ".$text['label-cidr']."\n";
-	echo "</td>\n";
-	echo "<td class='vtable' align='left'>\n";
-	echo "    <input class='formfld' type='text' name='cidr' maxlength='255' value=\"".escape($cidr)."\">\n";
-	echo "<br />\n";
-	echo $text['description-cidr']."\n";
-	echo "</td>\n";
-	echo "</tr>\n";
+	if (permission_exists("extension_cidr")) {
+		echo "<tr>\n";
+		echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
+		echo "    ".$text['label-cidr']."\n";
+		echo "</td>\n";
+		echo "<td class='vtable' align='left'>\n";
+		echo "    <input class='formfld' type='text' name='cidr' maxlength='255' value=\"".escape($cidr)."\">\n";
+		echo "<br />\n";
+		echo $text['description-cidr']."\n";
+		echo "</td>\n";
+		echo "</tr>\n";
+	}
 
 	echo "<tr>\n";
 	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";

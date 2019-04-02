@@ -45,6 +45,10 @@
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$y++;
+		$apps[$x]['permissions'][$y]['name'] = "xml_cdr_extension";
+		$apps[$x]['permissions'][$y]['groups'][] = "admin";
+		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "xml_cdr_domain";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
@@ -74,7 +78,6 @@
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "xml_cdr_b_leg";
-		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "hangup_cause";
@@ -87,7 +90,8 @@
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "xml_cdr_archive";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
-		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";		
+		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+		$y++;
 
 	//default settings
 		$y=0;
@@ -416,6 +420,12 @@
 		$apps[$x]['db'][$y]['fields'][$z]['name'] = "last_arg";
 		$apps[$x]['db'][$y]['fields'][$z]['type'] = "text";
 		$apps[$x]['db'][$y]['fields'][$z]['description']['en-us'] = "Save the last application data.";
+		$z++;
+		$apps[$x]['db'][$y]['fields'][$z]['name'] = "missed_call";
+		$apps[$x]['db'][$y]['fields'][$z]['type']['pgsql'] = "boolean";
+		$apps[$x]['db'][$y]['fields'][$z]['type']['sqlite'] = "text";
+		$apps[$x]['db'][$y]['fields'][$z]['type']['mysql'] = "text";
+		$apps[$x]['db'][$y]['fields'][$z]['description']['en-us'] = "";
 		$z++;
 		$apps[$x]['db'][$y]['fields'][$z]['name'] = "cc_side";
 		$apps[$x]['db'][$y]['fields'][$z]['type'] = "text";

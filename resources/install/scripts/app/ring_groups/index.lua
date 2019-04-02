@@ -1,5 +1,5 @@
 --	Part of FusionPBX
---	Copyright (C) 2010-2018 Mark J Crane <markjcrane@fusionpbx.com>
+--	Copyright (C) 2010-2019 Mark J Crane <markjcrane@fusionpbx.com>
 --	All rights reserved.
 --
 --	Redistribution and use in source and binary forms, with or without
@@ -136,8 +136,6 @@
 --get the variables
 	if (session:ready()) then
 		session:setAutoHangup(false);
-		domain_name = session:getVariable("domain_name");
-		domain_uuid = session:getVariable("domain_uuid");
 		ring_group_uuid = session:getVariable("ring_group_uuid");
 		recordings_dir = session:getVariable("recordings_dir");
 		sounds_dir = session:getVariable("sounds_dir");
@@ -155,6 +153,7 @@
 		context = session:getVariable("context");
 		call_direction = session:getVariable("call_direction");
 		accountcode = session:getVariable("accountcode");
+		local_ip_v4 = session:getVariable("local_ip_v4")
 	end
 
 --default to local if nil
@@ -187,13 +186,6 @@
 		record_ext = "wav";
 	end
 
---set the recording path
-	record_path = recordings_dir .. "/" .. domain_name .. "/archive/" .. os.date("%Y/%b/%d");
-	record_path = record_path:gsub("\\", "/");
-
---set the recording file
-	record_name = uuid .. "." .. record_ext;
-
 --prepare the api object
 	api = freeswitch.API();
 
@@ -206,24 +198,16 @@
 --get current switchname
 	hostname = trim(api:execute("switchname", ""))
 
---get the domain_uuid if it not already set
-	if (domain_uuid == nil or domain_uuid == '' and domain_name) then
-		sql = "SELECT domain_uuid FROM v_domains as d ";
-		sql = sql .. "where d.domain_name = :domain_name ";
-		local params = {domain_name = domain_name};
-		status = dbh:query(sql, params, function(row)
-			domain_uuid = row["domain_uuid"];
-		end);
-	end
-
 --get the ring group
-	ring_group_forward_enabled = "";
-	ring_group_forward_destination = "";
-	sql = "SELECT r.* FROM v_ring_groups as r ";
+	ring_group_forward_enabled = '';
+	ring_group_forward_destination = '';
+	sql = "SELECT d.domain_name, r.* FROM v_ring_groups as r, v_domains as d ";
 	sql = sql .. "where r.ring_group_uuid = :ring_group_uuid ";
-	sql = sql .. "and r.domain_uuid = :domain_uuid ";
-	local params = {ring_group_uuid = ring_group_uuid, domain_uuid = domain_uuid};
+	sql = sql .. "and r.domain_uuid = d.domain_uuid ";
+	local params = {ring_group_uuid = ring_group_uuid};
 	status = dbh:query(sql, params, function(row)
+		domain_uuid = row["domain_uuid"];
+		domain_name = row["domain_name"];
 		ring_group_name = row["ring_group_name"];
 		ring_group_extension = row["ring_group_extension"];
 		ring_group_greeting = row["ring_group_greeting"];
@@ -239,6 +223,13 @@
 		missed_call_data = row["ring_group_missed_call_data"];
 	end);
 
+--set the recording path
+	record_path = recordings_dir .. "/" .. domain_name .. "/archive/" .. os.date("%Y/%b/%d");
+	record_path = record_path:gsub("\\", "/");
+
+--set the recording file
+	record_name = uuid .. "." .. record_ext;
+
 ---set the call_timeout to a higher value to prevent the early timeout of the ring group
 	if (session:ready()) then
 		if (ring_group_call_timeout and #ring_group_call_timeout == 0) then
@@ -250,6 +241,7 @@
 --play the greeting
 	if (session:ready()) then
 		if (ring_group_greeting and #ring_group_greeting > 0) then
+			session:answer();
 			session:sleep(1000);
 			play_file(dbh, domain_name, domain_uuid, ring_group_greeting)
 			session:sleep(1000);
@@ -260,8 +252,7 @@
 	sql = "SELECT r.*, u.user_uuid FROM v_ring_groups as r, v_ring_group_users as u ";
 	sql = sql .. "where r.ring_group_uuid = :ring_group_uuid ";
 	sql = sql .. "and r.ring_group_uuid = u.ring_group_uuid ";
-	sql = sql .. "and r.domain_uuid = :domain_uuid ";
-	local params = {ring_group_uuid = ring_group_uuid, domain_uuid = domain_uuid};
+	local params = {ring_group_uuid = ring_group_uuid};
 	status = dbh:query(sql, params, function(row)
 		user_uuid = row["user_uuid"];
 	end);
@@ -504,7 +495,6 @@
 				destination_delay = row.destination_delay;
 				destination_timeout = row.destination_timeout;
 				destination_prompt = row.destination_prompt;
-				domain_name = row.domain_name;
 				toll_allow = row.toll_allow;
 
 				--determine if the user is registered if not registered then lookup 
@@ -520,7 +510,8 @@
 						not_registered_destination_number = api:executeString(cmd);
 						freeswitch.consoleLog("NOTICE", "[ring_group] "..not_registered_destination_number.."\n");
 						if (not_registered_destination_number ~= nil) then
-							destination_number = not_registered_destination_number;	
+							destination_number = not_registered_destination_number;
+							destinations[key]['destination_number'] = destination_number;
 						end
 
 						--check the new destination number for user_exists
@@ -533,61 +524,12 @@
 						end
 					end
 				end
-
-				---get destination that are using follow me
-				cmd = "user_data ".. destination_number .."@" ..domain_name.." var follow_me_enabled";
-				if (api:executeString(cmd) == "true") then
-					--get the follow me destinations
-					cmd = "user_data ".. destination_number .."@" ..domain_name.." var follow_me_destinations";
-					result_follow_me_destinations = api:executeString(cmd);
-					freeswitch.consoleLog("notice", "[ring groups][follow_me] key " .. key .. " " .. cmd .. " ".. result_follow_me_destinations .."\n");
-
-					follow_me_destinations = explode(",[", result_follow_me_destinations);
-					x = 0;
-					for k, v in pairs(follow_me_destinations) do
-						--increment the ordinal value
-						x = x + 1;
-
-						--seperate the variables from the destination
-						destination = explode("]", v);
-
-						--set the variables and clean the variables string
-						variables = destination[1];
-						variables = variables:gsub("%[", "");
-
-						--send details to the console
-						freeswitch.consoleLog("notice", "[ring groups][follow_me] variables ".. variables .."\n");
-						freeswitch.consoleLog("notice", "[ring groups][follow_me] destination ".. destination[2] .."\n");
-
-						--add to the destinations array
-						if destinations[x] == nil then destinations[x] = {} end
-						destinations[x]['destination_number'] = destination[2];
-						destinations[x]['domain_name'] = domain_name;
-						destinations[x]['destination_delay'] = '0';
-						destinations[x]['destination_timeout'] = '30';
-
-						--add the variables to the destinations array
-						variable_array = explode(",", variables);
-						for k2, v2 in pairs(variable_array) do
-							array = explode("=", v2);
-							if (array[2] ~= nil) then
-								destinations[x][array[1]] = array[2];
-							end
-						end
-
-						--if confirm is true true then set it to prompt
-						if (destinations[x]['confirm']  ~= nil and destinations[x]['confirm']  == 'true') then
-							destinations[x]['destination_prompt'] = '1';
-						end
-
-					end
-				end
 			end
 
 		--process the destinations
 			--x = 1;
 			--for key, row in pairs(destinations) do
-			--	freeswitch.consoleLog("NOTICE", "[ring group] zzz destination_number: "..row.destination_number.."\n");
+			--	freeswitch.consoleLog("NOTICE", "[ring group] destination_number: "..row.destination_number.."\n");
 			--end
 
 		--process the destinations
@@ -610,7 +552,6 @@
 					destination_prompt = row.destination_prompt;
 					group_confirm_key = row.group_confirm_key;
 					group_confirm_file = row.group_confirm_file;
-					domain_name = row.domain_name;
 					toll_allow = row.toll_allow;
 					user_exists = row.user_exists;
 
@@ -668,8 +609,12 @@
 
 				--export the ringback
 					if (ring_group_distinctive_ring ~= nil) then
-						ring_group_distinctive_ring = ring_group_distinctive_ring:gsub("${local_ip_v4}", session:getVariable("local_ip_v4"));
-						ring_group_distinctive_ring = ring_group_distinctive_ring:gsub("${domain_name}", session:getVariable("domain_name"));
+						if (local_ip_v4 ~= nil) then
+							ring_group_distinctive_ring = ring_group_distinctive_ring:gsub("${local_ip_v4}", local_ip_v4);
+						end
+						if (domain_name ~= nil) then
+							ring_group_distinctive_ring = ring_group_distinctive_ring:gsub("${domain_name}", domain_name);
+						end
 						session:execute("export", "sip_h_Alert-Info="..ring_group_distinctive_ring);
 					end
 
@@ -879,6 +824,8 @@
 								if ring_group_timeout_app and #ring_group_timeout_app > 0 then
 									session:execute(ring_group_timeout_app, ring_group_timeout_data);
 								end
+							--check and report missed call
+								missed();
 						end
 					else
 						if (ring_group_timeout_app ~= nil) then

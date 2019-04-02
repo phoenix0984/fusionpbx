@@ -237,7 +237,6 @@
 
 				//array cleanup
 					$x = 0;
-					//unset($_POST["autocomplete"]);
 					unset($_POST["target_file"]);
 					unset($_POST["file_action"]);
 
@@ -401,6 +400,8 @@
 	$device_lines[$x]['server_address'] = '';
 	$device_lines[$x]['outbound_proxy_primary'] = $_SESSION['provision']['outbound_proxy_primary']['text'];
 	$device_lines[$x]['outbound_proxy_secondary'] = $_SESSION['provision']['outbound_proxy_secondary']['text'];
+	$device_lines[$x]['server_address_primary'] = $_SESSION['provision']['server_address_primary']['text'];
+	$device_lines[$x]['server_address_secondary'] = $_SESSION['provision']['server_address_secondary']['text'];
 	$device_lines[$x]['display_name'] = '';
 	$device_lines[$x]['user_id'] = '';
 	$device_lines[$x]['auth_id'] = '';
@@ -1001,12 +1002,12 @@
 				echo "			</td>\n";
 
 				echo "			<td align='left'>\n";
-				echo "				<input class='formfld' style='width: 50px;' type='text' name='device_lines[".$x."][user_id]' maxlength='255' autocomplete=\"off\" value=\"".escape($row['user_id'])."\"/>\n";
+				echo "				<input class='formfld' style='width: 50px;' type='text' name='device_lines[".$x."][user_id]' maxlength='255' autocomplete=\"new-password\" value=\"".escape($row['user_id'])."\"/>\n";
 				echo "			</td>\n";
 
 				if (permission_exists('device_line_auth_id')) {
 					echo "			<td align='left'>\n";
-					echo "				<input class='formfld' style='width: 50px;' type='text' name='device_lines[".$x."][auth_id]' maxlength='255' autocomplete=\"off\" value=\"".escape($row['auth_id'])."\"/>\n";
+					echo "				<input class='formfld' style='width: 50px;' type='text' name='device_lines[".$x."][auth_id]' maxlength='255' autocomplete=\"new-password\" value=\"".escape($row['auth_id'])."\"/>\n";
 					echo "			</td>\n";
 				}
 
@@ -1449,8 +1450,8 @@
 		echo "	".$text['label-device']."\n";
 		echo "</td>\n";
 		echo "<td class='vtable' align='left'>\n";
-		echo "	<input class='formfld' type='text' name='device_username' id='device_username' autocomplete=\"off\" maxlength='255' placeholder=\"".$text['label-device_username']."\" value=\"".escape($device_username)."\"/>\n";
-		echo "	<input class='formfld' type='password' name='device_password' id='device_password' autocomplete=\"off\" onmouseover=\"this.type='text';\" onfocus=\"this.type='text';\" onmouseout=\"if (!$(this).is(':focus')) { this.type='password'; }\" onblur=\"this.type='password';\" maxlength='255' placeholder=\"".$text['label-device_password']."\" value=\"".escape($device_password)."\"/>\n";
+		echo "	<input class='formfld' type='text' name='device_username' id='device_username' autocomplete=\"new-password\" maxlength='255' placeholder=\"".$text['label-device_username']."\" value=\"".escape($device_username)."\"/>\n";
+		echo "	<input class='formfld' type='password' name='device_password' id='device_password' autocomplete=\"new-password\" onmouseover=\"this.type='text';\" onfocus=\"this.type='text';\" onmouseout=\"if (!$(this).is(':focus')) { this.type='password'; }\" onblur=\"this.type='password';\" maxlength='255' placeholder=\"".$text['label-device_password']."\" value=\"".escape($device_password)."\"/>\n";
 		echo "	<div style='display: none;' id='duplicate_username_response'></div>\n";
 		echo "<br />\n";
 		echo $text['description-device']."\n";

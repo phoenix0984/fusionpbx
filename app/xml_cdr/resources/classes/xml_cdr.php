@@ -102,6 +102,7 @@ if (!class_exists('xml_cdr')) {
 			$this->fields[] = "context";
 			$this->fields[] = "xml";
 			$this->fields[] = "json";
+			$this->fields[] = "missed_call";
 			$this->fields[] = "caller_id_name";
 			$this->fields[] = "caller_id_number";
 			$this->fields[] = "caller_destination";
@@ -285,6 +286,17 @@ if (!class_exists('xml_cdr')) {
 							$destination_number = urldecode($xml->variables->last_sent_callee_id_number);
 						}
 
+					//set missed calls
+						$missed_call = 'false';
+						if ($xml->variables->call_direction == 'local' || $xml->variables->call_direction == 'inbound') {
+							if ($xml->variables->billsec == 0) {
+								$missed_call = 'true';
+							}
+						}
+						if ($xml->variables->missed_call == 'true') {
+							$missed_call = 'true';
+						}
+
 					//get the caller details
 						$caller_id_name = urldecode($xml->variables->effective_caller_id_name);
 						$caller_id_number = urldecode($xml->variables->effective_caller_id_number);
@@ -305,6 +317,7 @@ if (!class_exists('xml_cdr')) {
 						$this->array[$key]['source_number'] = check_str(urldecode($xml->variables->effective_caller_id_number));
 						$this->array[$key]['user_context'] = check_str(urldecode($xml->variables->user_context));
 						$this->array[$key]['network_addr'] = check_str(urldecode($xml->variables->sip_network_ip));
+						$this->array[$key]['missed_call'] = check_str($missed_call);
 						$this->array[$key]['caller_id_name'] = check_str($caller_id_name);
 						$this->array[$key]['caller_id_number'] = check_str($caller_id_number);
 						$this->array[$key]['caller_destination'] = check_str(urldecode($xml->variables->caller_destination));
@@ -430,20 +443,20 @@ if (!class_exists('xml_cdr')) {
 						}
 
 					//get the recording details
-						if (strlen($xml->variables->record_name) > 0) {
+						if (strlen($xml->variables->record_session) > 0) {
 							$record_path = urldecode($xml->variables->record_path);
 							$record_name = urldecode($xml->variables->record_name);
-							$record_length = urldecode($xml->variables->billsec);
-						}
-						elseif (urldecode($xml->variables->current_application) == 'record_session') {
-							$record_path = dirname(urldecode($xml->variables->current_application_data));
-							$record_name = basename(urldecode($xml->variables->current_application_data));
 							$record_length = urldecode($xml->variables->record_seconds);
 						}
-						elseif (strlen($xml->variables->record_session) > 0) {
-							$record_path = dirname(urldecode($xml->variables->record_session));
-							$record_name = basename(urldecode($xml->variables->record_session));
+						elseif (!isset($record_path) && urldecode($xml->variables->last_app) == "record_session") {
+							$record_path = dirname(urldecode($xml->variables->last_arg));
+							$record_name = basename(urldecode($xml->variables->last_arg));
 							$record_length = urldecode($xml->variables->record_seconds);
+						}
+						elseif (strlen($xml->variables->record_name) > 0) {
+							$record_path = urldecode($xml->variables->record_path);
+							$record_name = urldecode($xml->variables->record_name);
+							$record_length = urldecode($xml->variables->duration);
 						}
 						elseif (strlen($xml->variables->sofia_record_file) > 0) {
 							$record_path = dirname(urldecode($xml->variables->sofia_record_file));
@@ -465,16 +478,6 @@ if (!class_exists('xml_cdr')) {
 								$record_length = urldecode($xml->variables->duration);
 							}
 						}
-						elseif (strlen($xml->variables->{'nolocal:api_on_answer'}) > 0) {
-							$command = str_replace("\n", " ", urldecode($xml->variables->{'nolocal:api_on_answer'}));
-							$parts = explode(" ", $command);
-							if ($parts[0] == "uuid_record") {
-								$recording = $parts[3];
-								$record_path = dirname($recording);
-								$record_name = basename($recording);
-								$record_length = urldecode($xml->variables->duration);
-							}
-						}				
 						elseif (strlen($xml->variables->current_application_data) > 0) {
 							$commands = explode(",", urldecode($xml->variables->current_application_data));
 							foreach ($commands as $command) {
@@ -490,6 +493,31 @@ if (!class_exists('xml_cdr')) {
 										$record_length = urldecode($xml->variables->duration);
 									}
 								}
+							}
+						}
+						if (!isset($record_name)) {
+							$bridge_uuid = urldecode($xml->variables->bridge_uuid);
+							$path = $_SESSION['switch']['recordings']['dir'].'/'.$domain_name.'/archive/'.$start_year.'/'.$start_month.'/'.$start_day;
+							if (file_exists($path.'/'.$bridge_uuid.'.wav')) {
+								$record_path = $path;
+								$record_name = $bridge_uuid.'.wav';
+								$record_length = urldecode($xml->variables->duration);
+							} elseif (file_exists($path.'/'.$bridge_uuid.'.mp3')) {
+								$record_path = $path;
+								$record_name = $bridge_uuid.'.mp3';
+								$record_length = urldecode($xml->variables->duration);
+							}
+						}
+						if (!isset($record_name)) {
+							$path = $_SESSION['switch']['recordings']['dir'].'/'.$domain_name.'/archive/'.$start_year.'/'.$start_month.'/'.$start_day;
+							if (file_exists($path.'/'.$uuid.'.wav')) {
+								$record_path = $path;
+								$record_name = $uuid.'.wav';
+								$record_length = urldecode($xml->variables->duration);
+							} elseif (file_exists($path.'/'.$uuid.'.mp3')) {
+								$record_path = $path;
+								$record_name = $uuid.'.mp3';
+								$record_length = urldecode($xml->variables->duration);
 							}
 						}
 

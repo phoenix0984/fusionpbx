@@ -1,6 +1,6 @@
 --	xml_handler.lua
 --	Part of FusionPBX
---	Copyright (C) 2013 - 2018 Mark J Crane <markjcrane@fusionpbx.com>
+--	Copyright (C) 2013 - 2019 Mark J Crane <markjcrane@fusionpbx.com>
 --	All rights reserved.
 --
 --	Redistribution and use in source and binary forms, with or without
@@ -87,7 +87,7 @@
 		-- Make sance only for extensions with number_alias
 		--  false - you should register with AuthID=UserID=Extension (default)
 		--  true  - you should register with AuthID=Extension and UserID=Number Alias
-		-- 	also in this case you need 2 records in memcache for one extension
+		-- 	also in this case you need 2 records in cache for one extension
 			local DIAL_STRING_BASED_ON_USERID = xml_handler and xml_handler["reg_as_number_alias"]
 
 		-- Use number as presence_id
@@ -150,15 +150,15 @@
 		-- get the cache. We can use cache only if we do not use `fs_path`
 		-- or we do not need dial-string. In other way we have to use database.
 			if (continue) and (not USE_FS_PATH) then
-				if cache.support() and domain_name then
+				if (cache.support() and domain_name) then
 					local key, err = "directory:" .. (from_user or user) .. "@" .. domain_name
 					XML_STRING, err = cache.get(key);
 
 					if debug['cache'] then
 						if not XML_STRING then
-							freeswitch.consoleLog("notice", "[xml_handler-directory][memcache] get key: " .. key .. " fail: " .. tostring(err) .. "\n")
+							freeswitch.consoleLog("notice", "[xml_handler-directory][cache] get key: " .. key .. " fail: " .. tostring(err) .. "\n")
 						else
-							freeswitch.consoleLog("notice", "[xml_handler-directory][memcache] get key: " .. key .. " pass!" .. "\n")
+							freeswitch.consoleLog("notice", "[xml_handler-directory][cache] get key: " .. key .. " pass!" .. "\n")
 						end
 					end
 				end
@@ -357,7 +357,7 @@
 								if (row.follow_me_uuid ~= nil and string.len(row.follow_me_uuid) > 0) then
 									follow_me_uuid = row.follow_me_uuid;
 									follow_me_enabled = row.follow_me_enabled;
-									follow_me_destinations= row.follow_me_destinations;
+									--follow_me_destinations= row.follow_me_destinations;
 								end
 
 							-- check matching UserID and AuthName
@@ -633,9 +633,9 @@
 							if (follow_me_enabled ~= nil) and (string.len(follow_me_enabled) > 0) then
 								table.insert(xml, [[								<variable name="follow_me_enabled" value="]] .. follow_me_enabled .. [["/>]]);
 							end
-							if (follow_me_destinations ~= nil) and (string.len(follow_me_destinations) > 0) then
-								table.insert(xml, [[								<variable name="follow_me_destinations" value="]] .. follow_me_destinations .. [["/>]]);
-							end
+							--if (follow_me_destinations ~= nil) and (string.len(follow_me_destinations) > 0) then
+							--	table.insert(xml, [[								<variable name="follow_me_destinations" value="]] .. follow_me_destinations .. [["/>]]);
+							--end
 							if (do_not_disturb ~= nil) and (string.len(do_not_disturb) > 0) then
 								table.insert(xml, [[								<variable name="do_not_disturb" value="]] .. do_not_disturb .. [["/>]]);
 							end

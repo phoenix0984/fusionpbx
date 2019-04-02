@@ -56,6 +56,7 @@
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "user";
+		$apps[$x]['permissions'][$y]['groups'][] = "agent";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "voicemail_delete";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
@@ -69,11 +70,13 @@
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "user";
+		$apps[$x]['permissions'][$y]['groups'][] = "agent";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "voicemail_message_add";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "user";
+		$apps[$x]['permissions'][$y]['groups'][] = "agent";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "voicemail_message_edit";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
@@ -83,6 +86,7 @@
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "user";
+		$apps[$x]['permissions'][$y]['groups'][] = "agent";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "voicemail_sms_edit";
 		$y++;
@@ -98,21 +102,25 @@
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "user";
+		$apps[$x]['permissions'][$y]['groups'][] = "agent";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "voicemail_option_edit";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "user";
+		$apps[$x]['permissions'][$y]['groups'][] = "agent";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "voicemail_option_view";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "user";
+		$apps[$x]['permissions'][$y]['groups'][] = "agent";
 		$y++;
 		$apps[$x]['permissions'][$y]['name'] = "voicemail_option_delete";
 		$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 		$apps[$x]['permissions'][$y]['groups'][] = "admin";
 		$apps[$x]['permissions'][$y]['groups'][] = "user";
+		$apps[$x]['permissions'][$y]['groups'][] = "agent";
 
 	//default settings
 		$y=0;
@@ -326,6 +334,8 @@
 		$apps[$x]['db'][$y]['fields'][$z]['type']['sqlite'] = "text";
 		$apps[$x]['db'][$y]['fields'][$z]['type']['mysql'] = "char(36)";
 		$apps[$x]['db'][$y]['fields'][$z]['key']['type'] = "foreign";
+		$apps[$x]['db'][$y]['fields'][$z]['key']['reference']['table'] = "v_voicemails";
+		$apps[$x]['db'][$y]['fields'][$z]['key']['reference']['field'] = "voicemail_uuid";
 		$z++;
 		$apps[$x]['db'][$y]['fields'][$z]['name'] = "created_epoch";
 		$apps[$x]['db'][$y]['fields'][$z]['type'] = "numeric";

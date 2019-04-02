@@ -17,7 +17,7 @@
 
 	The Initial Developer of the Original Code is
 	Mark J Crane <markjcrane@fusionpbx.com>
-	Portions created by the Initial Developer are Copyright (C) 2008-2016
+	Portions created by the Initial Developer are Copyright (C) 2008-2019
 	the Initial Developer. All Rights Reserved.
 
 	Contributor(s):
@@ -27,7 +27,7 @@
 
 	if (!function_exists('software_version')) {
 		function software_version() {
-			return '4.5.3';
+			return '4.5.4';
 		}
 	}
 
@@ -258,7 +258,7 @@
 	if (!function_exists('group_members')) {
 		function group_members($db, $user_uuid) {
 			global $domain_uuid;
-			$sql = "select * from v_group_users ";
+			$sql = "select * from v_user_groups ";
 			$sql .= "where domain_uuid = '$domain_uuid' ";
 			$sql .= "and user_uuid = '".$user_uuid."' ";
 			$prep_statement = $db->prepare(check_sql($sql));
@@ -289,7 +289,7 @@
 	if (!function_exists('superadmin_list')) {
 		function superadmin_list($db) {
 			global $domain_uuid;
-			$sql = "select * from v_group_users ";
+			$sql = "select * from v_user_groups ";
 			$sql .= "where group_name = 'superadmin' ";
 			$prep_statement = $db->prepare(check_sql($sql));
 			$prep_statement->execute();
@@ -766,9 +766,9 @@
 
 				//add the user to the member group
 					$group_name = 'user';
-					$sql = "insert into v_group_users ";
+					$sql = "insert into v_user_groups ";
 					$sql .= "(";
-					$sql .= "group_user_uuid, ";
+					$sql .= "user_group_uuid, ";
 					$sql .= "domain_uuid, ";
 					$sql .= "group_name, ";
 					$sql .= "user_uuid ";
@@ -862,67 +862,74 @@ function format_string ($format, $data) {
 
 //browser detection without browscap.ini dependency
 	function http_user_agent($info = '') {
-		$u_agent = $_SERVER['HTTP_USER_AGENT'];
-		$bname = 'Unknown';
-		$platform = 'Unknown';
-		$version= "";
 
-		//get the platform?
-			if (preg_match('/linux/i', $u_agent)) {
-				$platform = 'linux';
+		//set default values
+			$user_agent = $_SERVER['HTTP_USER_AGENT'];
+			$browser_name = 'Unknown';
+			$platform = 'Unknown';
+			$version = '';
+			$mobile = false;
+
+		//get the platform
+			if (preg_match('/linux/i', $user_agent)) {
+				$platform = 'Linux';
 			}
-			elseif (preg_match('/macintosh|mac os x/i', $u_agent)) {
-				$platform = 'mac';
+			elseif (preg_match('/macintosh|mac os x/i', $user_agent)) {
+				$platform = 'Apple';
 			}
-			elseif (preg_match('/windows|win32/i', $u_agent)) {
-				$platform = 'windows';
+			elseif (preg_match('/windows|win32/i', $user_agent)) {
+				$platform = 'Windows';
 			}
 
-		//get the name of the useragent yes seperately and for good reason
-			if(preg_match('/MSIE/i',$u_agent) && !preg_match('/Opera/i',$u_agent))
-			{
-				$bname = 'Internet Explorer';
-				$ub = "MSIE";
+		//set mobile to true or false
+			if (preg_match('/mobile/i', $user_agent)) {
+				$platform = 'Mobile';
+				$mobile = true;
 			}
-			elseif(preg_match('/Firefox/i',$u_agent))
-			{
-				$bname = 'Mozilla Firefox';
-				$ub = "Firefox";
+			elseif (preg_match('/android/i', $user_agent)) {
+				$platform = 'Android';
+				$mobile = true;
 			}
-			elseif(preg_match('/Chrome/i',$u_agent))
-			{
-				$bname = 'Google Chrome';
-				$ub = "Chrome";
+
+		//get the name of the useragent
+			if (preg_match('/MSIE/i',$user_agent) && !preg_match('/Opera/i',$user_agent)) {
+				$browser_name = 'Internet Explorer';
+				$browser_shortname = 'MSIE';
 			}
-			elseif(preg_match('/Safari/i',$u_agent))
-			{
-				$bname = 'Apple Safari';
-				$ub = "Safari";
+			elseif (preg_match('/Firefox/i',$user_agent)) {
+				$browser_name = 'Mozilla Firefox';
+				$browser_shortname = 'Firefox';
 			}
-			elseif(preg_match('/Opera/i',$u_agent))
-			{
-				$bname = 'Opera';
-				$ub = "Opera";
+			elseif (preg_match('/Chrome/i',$user_agent)) {
+				$browser_name = 'Google Chrome';
+				$browser_shortname = 'Chrome';
 			}
-			elseif(preg_match('/Netscape/i',$u_agent))
-			{
-				$bname = 'Netscape';
-				$ub = "Netscape";
+			elseif (preg_match('/Safari/i',$user_agent)) {
+				$browser_name = 'Apple Safari';
+				$browser_shortname = 'Safari';
+			}
+			elseif (preg_match('/Opera/i',$user_agent)) {
+				$browser_name = 'Opera';
+				$browser_shortname = 'Opera';
+			}
+			elseif (preg_match('/Netscape/i',$user_agent)) {
+				$browser_name = 'Netscape';
+				$browser_shortname = 'Netscape';
 			}
 
 		//finally get the correct version number
-			$known = array('Version', $ub, 'other');
+			$known = array('Version', $browser_shortname, 'other');
 			$pattern = '#(?<browser>' . join('|', $known) . ')[/ ]+(?<version>[0-9.|a-zA-Z.]*)#';
-			if (!preg_match_all($pattern, $u_agent, $matches)) {
-				// we have no matching number just continue
+			if (!preg_match_all($pattern, $user_agent, $matches)) {
+				//we have no matching number just continue
 			}
 
-		// see how many we have
+		//see how many we have
 			$i = count($matches['browser']);
 			if ($i != 1) {
 				//we will have two since we are not using 'other' argument yet
 				//see if version is before or after the name
-				if (strripos($u_agent,"Version") < strripos($u_agent,$ub)){
+				if (strripos($user_agent,"Version") < strripos($user_agent,$browser_shortname)) {
 					$version= $matches['version'][0];
 				}
 				else {
@@ -933,58 +940,63 @@ function format_string ($format, $data) {
 				$version= $matches['version'][0];
 			}
 
-		// check if we have a number
-			if ($version==null || $version=="") {$version="?";}
+		//check if we have a number
+			if ($version == null || $version == "") { $version = "?"; }
 
-		switch ($info) {
-			case "agent": return $u_agent; break;
-			case "name": return $bname; break;
-			case "version": return $version; break;
-			case "platform": return $platform; break;
-			case "pattern": return $pattern; break;
-			default :
-				return array(
-					'userAgent' => $u_agent,
-					'name' => $bname,
-					'version' => $version,
-					'platform' => $platform,
-					'pattern' => $pattern
-				);
-		}
+		//return the data
+			switch ($info) {
+				case "agent": return $user_agent; break;
+				case "name": return $browser_name; break;
+				case "version": return $version; break;
+				case "platform": return $platform; break;
+				case "mobile": return $mobile; break;
+				case "pattern": return $pattern; break;
+				default :
+					return array(
+						'user_agent' => $user_agent,
+						'name' => $browser_name,
+						'version' => $version,
+						'platform' => $platform,
+						'mobile' => $mobile,
+						'pattern' => $pattern
+					);
+			}
 	}
 
 //tail php function for non posix systems
 	function tail($file, $num_to_get=10) {
-			$fp = fopen($file, 'r');
-			$position = filesize($file);
-			$chunklen = 4096;
-			if($position-$chunklen<=0) {
+		$fp = fopen($file, 'r');
+		$position = filesize($file);
+		$chunklen = 4096;
+		if($position-$chunklen<=0) {
+			fseek($fp,0);
+		}
+		else {
+			fseek($fp, $position-$chunklen);
+		}
+		$data="";$ret="";$lc=0;
+		while($chunklen > 0) {
+			$data = fread($fp, $chunklen);
+			$dl=strlen($data);
+			for($i=$dl-1;$i>=0;$i--){
+				if($data[$i]=="\n"){
+					if($lc==0 && $ret!="")$lc++;
+					$lc++;
+					if($lc>$num_to_get)return $ret;
+				}
+				$ret=$data[$i].$ret;
+			}
+			if($position-$chunklen<=0){
 				fseek($fp,0);
+				$chunklen=$chunklen-abs($position-$chunklen);
 			}
 			else {
 				fseek($fp, $position-$chunklen);
 			}
-			$data="";$ret="";$lc=0;
-			while($chunklen > 0)
-			{
-					$data = fread($fp, $chunklen);
-					$dl=strlen($data);
-					for($i=$dl-1;$i>=0;$i--){
-							if($data[$i]=="\n"){
-									if($lc==0 && $ret!="")$lc++;
-									$lc++;
-									if($lc>$num_to_get)return $ret;
-							}
-							$ret=$data[$i].$ret;
-					}
-					if($position-$chunklen<=0){
-							fseek($fp,0);
-							$chunklen=$chunklen-abs($position-$chunklen);
-					}else   fseek($fp, $position-$chunklen);
-					$position = $position - $chunklen;
-			}
-			fclose($fp);
-			return $ret;
+			$position = $position - $chunklen;
+		}
+		fclose($fp);
+		return $ret;
 	}
 
 //generate a random password with upper, lowercase and symbols
@@ -1379,7 +1391,7 @@ function number_pad($number,$n) {
 
 //function to send email
 	if (!function_exists('send_email')) {
-		function send_email($eml_recipients, $eml_subject, $eml_body, &$eml_error = '', $eml_from_address = '', $eml_from_name = '', $eml_priority = 3) {
+		function send_email($eml_recipients, $eml_subject, $eml_body, &$eml_error = '', $eml_from_address = '', $eml_from_name = '', $eml_priority = 3, $eml_debug_level = 0) {
 			/*
 			RECIPIENTS NOTE:
 
@@ -1434,22 +1446,36 @@ function number_pad($number,$n) {
 
 			$mail = new PHPMailer();
 			$mail -> IsSMTP();
+			if ($_SESSION['email']['smtp_hostname']['text'] != '') {
+				$mail -> Hostname = $_SESSION['email']['smtp_hostname']['text'];
+			}
 			$mail -> Host = $_SESSION['email']['smtp_host']['text'];
-			if ($_SESSION['email']['smtp_port']['text'] != '') {
-				$mail -> Port = $_SESSION['email']['smtp_port']['text'];
+			if (is_numeric($_SESSION['email']['smtp_port']['numeric'])) {
+				$mail -> Port = $_SESSION['email']['smtp_port']['numeric'];
 			}
 			if ($_SESSION['email']['smtp_auth']['text'] == "true") {
 				$mail -> SMTPAuth = $_SESSION['email']['smtp_auth']['text'];
-			}
-			if ($_SESSION['email']['smtp_username']['text']) {
 				$mail -> Username = $_SESSION['email']['smtp_username']['text'];
 				$mail -> Password = $_SESSION['email']['smtp_password']['text'];
+			}
+			else {
+				$mail -> SMTPAuth = 'false';
 			}
 			if ($_SESSION['email']['smtp_secure']['text'] == "none") {
 				$_SESSION['email']['smtp_secure']['text'] = '';
 			}
 			if ($_SESSION['email']['smtp_secure']['text'] != '') {
 				$mail -> SMTPSecure = $_SESSION['email']['smtp_secure']['text'];
+			}
+			if (isset($_SESSION['email']['smtp_validate_certificate']) && $_SESSION['email']['smtp_validate_certificate']['boolean'] == "false") {
+				// bypass TLS certificate check e.g. for self-signed certificates
+				$mail -> SMTPOptions = array(
+					'ssl' => array(
+					'verify_peer' => false,
+					'verify_peer_name' => false,
+					'allow_self_signed' => true
+					)
+				);
 			}
 			$eml_from_address = ($eml_from_address != '') ? $eml_from_address : $_SESSION['email']['smtp_from']['text'];
 			$eml_from_name = ($eml_from_name != '') ? $eml_from_name : $_SESSION['email']['smtp_from_name']['text'];
@@ -1458,6 +1484,9 @@ function number_pad($number,$n) {
 			$mail -> Subject = $eml_subject;
 			$mail -> MsgHTML($eml_body);
 			$mail -> Priority = $eml_priority;
+			if (is_numeric($eml_debug_level) && $eml_debug_level > 0) {
+				$mail -> SMTPDebug = $eml_debug_level;
+			}
 
 			$address_found = false;
 
@@ -1519,15 +1548,20 @@ function number_pad($number,$n) {
 
 //encrypt a string
 	if (!function_exists('encrypt')) {
-		function encrypt($key, $str_to_enc) {
-			return base64_encode(mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($key), $str_to_enc, MCRYPT_MODE_CBC, md5(md5($key))));
+		function encrypt($key, $data) {
+			$encryption_key = base64_decode($key);
+			$iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+			$encrypted = openssl_encrypt($data, 'aes-256-cbc', $encryption_key, 0, $iv);
+			return base64_encode($encrypted.'::'.$iv);
 		}
 	}
 
 //decrypt a string
 	if (!function_exists('decrypt')) {
-		function decrypt($key, $str_to_dec) {
-			return rtrim(mcrypt_decrypt(MCRYPT_RIJNDAEL_256, md5($key), base64_decode($str_to_dec), MCRYPT_MODE_CBC, md5(md5($key))), "\0");
+		function decrypt($key, $data) {
+			$encryption_key = base64_decode($key);
+			list($encrypted_data, $iv) = explode('::', base64_decode($data), 2);
+			return openssl_decrypt($encrypted_data, 'aes-256-cbc', $encryption_key, 0, $iv);
 		}
 	}
 
@@ -1940,7 +1974,7 @@ function number_pad($number,$n) {
 		//return htmlentities($string, ENT_QUOTES, 'UTF-8');
 	}
 
-// output pre-formatted array keys and values
+//output pre-formatted array keys and values
 	if (!function_exists('view_array')) {
 		function view_array($array, $exit = true) {
 			echo '<br><pre>'.print_r($array, true).'</pre><br>';
@@ -1948,7 +1982,7 @@ function number_pad($number,$n) {
 		}
 	}
 
-// format db date and/or time to local date and/or time
+//format db date and/or time to local date and/or time
 	if (!function_exists('format_when_local')) {
 		function format_when_local($when, $format = 'dt', $include_seconds = false) {
 			if ($when != '') {
@@ -2003,5 +2037,42 @@ function number_pad($number,$n) {
 			}
 		}
 	}
+
+//define email button (src: https://buttons.cm)
+	if (!function_exists('email_button')) {
+		function email_button($text = 'Click Here!', $link = URL, $bg_color = '#dddddd', $fg_color = '#000000', $radius = '') {
+
+			// default button radius
+			$radius = $radius != '' ? $radius : '3px';
+
+			// retrieve single/first numeric radius value for ms arc
+			$tmp = $radius;
+			if (substr_count($radius, ' ') > 0) {
+				$tmp = explode(' ', $radius);
+				$tmp = $tmp[0];
+			}
+			$tmp = preg_replace("/[^0-9,.]/", '', $tmp); // remove non-numeric characters
+			$arc = floor($tmp / 35 * 100); // calculate percentage
+
+			// create button code
+			$btn = "
+				<div>
+					<!--[if mso]>
+					  <v:roundrect xmlns:v='urn:schemas-microsoft-com:vml' xmlns:w='urn:schemas-microsoft-com:office:word' href='".$link."' style='height: 35px; v-text-anchor: middle; width: 140px;' arcsize='".$arc."%' stroke='f' fillcolor='".$bg_color."'>
+							<w:anchorlock/>
+							<center>
+					<![endif]-->
+					<a href='".$link."' style='background-color: ".$bg_color."; border-radius: ".$radius."; color: ".$fg_color."; display: inline-block; font-family: sans-serif; font-size: 13px; font-weight: bold; line-height: 35px; text-align: center; text-decoration: none; width: 140px; -webkit-text-size-adjust: none;'>".$text."</a>
+					<!--[if mso]>
+							</center>
+						</v:roundrect>
+					<![endif]-->
+				</div>
+				";
+
+			return $btn;
+		}
+	}
+
 
 ?>
